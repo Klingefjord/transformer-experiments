@@ -1,9 +1,12 @@
+import torch
 import argparse
 import collections
 import json
 import os
 import re
 import typing
+
+from vocab import VocabBuilder
 
 
 class Encoder:
@@ -22,11 +25,8 @@ class Encoder:
         tokens = [w + "*" for w in text.split(" ")]
 
         for token in tokens:
-            # perform all the applicable bpe merges according to self.bpe
             token_merged = self.bpe(token).split(" ")
-            # translate all bpe tokens to integers
             token_ix = [self.encoder[bpe_token] for bpe_token in token_merged]
-            # extend our running list of all output integers
             bpe_idx.extend(token_ix)
 
         return bpe_idx
@@ -45,7 +45,8 @@ class Encoder:
         return pairs
 
     def bpe(self, token) -> str:
-        """Iteratively merge all bpe tokens up the tree for the token (a word)"""
+        """Iteratively merge all bpe tokens up the tree for the token. A token here is a word or subword."""
+
         if token in self.cache:
             return self.cache[token]
 
@@ -107,111 +108,58 @@ class Encoder:
         return word
 
 
-class VocabBuilder:
-    """Class that builds a vocab from a text corpus using byte-pair encodings"""
+class Tokenizer:
+    """PyTorch-aware class that wraps the Encoder above"""
 
-    def __call__(self, path: str, num_merges: int = 10000) -> typing.Tuple[dict, dict]:
-        """Run the vocab builder"""
+    def __init__(self, vocab, merges) -> None:
+        self.encoder = create_encoder(vocab, merges)
 
-        vocab = self._create_vocab(path)
-        return self._bpe(vocab, num_merges)
+    def __call__(self, text, return_tensors="pt"):
+        # PyTorch only; here because we want to match huggingface/transformers interface
+        assert return_tensors == "pt"
+        # single string input for now, in the future potentially a list of strings
+        assert isinstance(text, str)
+        # encode and create a "batch dimension" of 1
+        idx = [self.encoder.encode(text)]
+        # wrap into PyTorch tensor
+        out = torch.tensor(idx, dtype=torch.long)
+        return out
 
-    def _get_pairs(self, vocab) -> dict:
-        """Count pairs"""
-
-        pairs = collections.defaultdict(int)
-        for word, _ in vocab.items():
-            symbols = word.split()
-            for i in range(len(symbols) - 1):
-                pairs[symbols[i], symbols[i + 1]] += 1
-
-        return pairs
-
-    def _get_tokens(self, vocab: dict) -> dict:
-        """Get tokens from vocab"""
-
-        tokens = collections.defaultdict(int)
-        for word, freq in vocab.items():
-            word_tokens = word.split()
-            for token in word_tokens:
-                tokens[token] += freq
-        return tokens
-
-    def _merge_vocab(self, pair: tuple, v_in: dict) -> dict:
-        """Merge all occurrences of the most frequent pair"""
-
-        v_out = {}
-        bigram = re.escape(" ".join(pair))
-        p = re.compile(r"(?<!\S)" + bigram + r"(?!\S)")
-        for word in v_in:
-            w_out = p.sub("".join(pair), word)
-            v_out[w_out] = v_in[word]
-        return v_out
-
-    def _create_vocab(self, path) -> dict:
-        """Build a vocab from a file"""
-
-        vocab = collections.defaultdict(int)
-        with open(path) as f:
-            for line in f:
-                for word in line.split():
-                    vocab[" ".join([c for c in word]) + " *"] += 1
-
-            return vocab
-
-    def _bpe(self, vocab, num_merges=500) -> typing.Tuple[dict, dict]:
-        """Create byte-pair encodings from a text corpus"""
-
-        merges = []
-
-        for i in range(num_merges):
-            pairs = self._get_pairs(vocab)
-
-            if not pairs:
-                break
-
-            pair = max(pairs, key=pairs.get)
-            vocab = self._merge_vocab(pair, vocab)
-
-            merges.append(pair)
-
-            if i % 10 == 0:
-                print(
-                    "Iteration: {}\t Tokens: {}".format(i, len(self._get_tokens(vocab)))
-                )
-
-        # replace the number of occurences with a unique index
-        final_vocab = {k: i for i, (k, _) in enumerate(self._get_tokens(vocab).items())}
-
-        # return the final vocab and the merges
-        return final_vocab, merges
+    def decode(self, idx):
+        # ensure a simple 1D tensor for now
+        assert idx.ndim == 1
+        # decode indices to text
+        text = self.encoder.decode(idx.tolist())
+        return text
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--path", default="./pg16457.txt", type=str)
-    parser.add_argument("--num_merges", default=1000, type=int)
-    args = parser.parse_args()
-
+def create_encoder(path, num_merges=10000):
     # prepare the vocabulary and byte pair encodings
     vocab, merges = {}, {}
-
     if not os.path.exists("vocab.txt") or not os.path.exists("merges.txt"):
-        vb = VocabBuilder()
-        vocab, merges = vb(args.path, args.num_merges)
+        vocab, merges = VocabBuilder.build(path, num_merges)
 
         with open("vocab.txt", "w") as f:
             f.write(json.dumps(vocab))
         with open("merges.txt", "w") as f:
             f.write(json.dumps(merges))
     else:
-        vocab = json.loads(open("vocab.txt", "r").read())
-        merges = json.loads(open("merges.txt", "r").read())
-
+        with open("vocab.txt") as f:
+            vocab = json.loads(f.read())
+        with open("merges.txt") as f:
+            merges = json.loads(f.read())
     merges = [(tuple(l)) for l in merges]
 
-    # create the encoder
-    encoder = Encoder(vocab, merges)
+    return Encoder(vocab, merges)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--path", default="./data/pg16457.txt", type=str)
+    parser.add_argument("--num_merges", default=1000, type=int)
+    args = parser.parse_args()
+
+    encoder = create_encoder(args.path, args.num_merges)
 
     # encode a sentence
     indices = encoder.encode("Hello, world! I am Oliver.")
