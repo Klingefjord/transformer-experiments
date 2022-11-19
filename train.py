@@ -1,61 +1,42 @@
 """Train the model specified in the arguments and log results to wandb."""
 
 import pytorch_lightning as pl
+import torch
 from data import prepare_data
-from loader import *
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 import argparse
 from model import GPTTransformer
+from utils import Config
 
-from utils import initialize_model
 
+def train(config: Config):
+    """Train the model with the given configuration."""
 
-def main(
-    dataset_path,
-    model_name,
-    seq_len,
-    d_embed,
-    epoch,
-    learning_rate,
-    batch_size,
-    weight_decay,
-    dropout,
-    wandb_name="transformer-experiments",
-):
     # prepare the dataset
     train_loader, validation_loader, vocab_size = prepare_data(
-        batch_size=batch_size,
-        seq_len=seq_len,
+        batch_size=config.batch_size,
+        seq_len=config.seq_len,
     )
+
+    # update the vocab size in the config
+    config.vocab_size = vocab_size
 
     # set up wandb logger
-    log_config = {
-        "dataset": dataset_path,
-        "model": model_name,
-        "epoch": epoch,
-        "learning_rate": learning_rate,
-        "batch_size": batch_size,
-        "weight_decay": weight_decay,
-    }
-
-    wandb_logger = WandbLogger(name=model_name, project=wandb_name, config=log_config)
+    # wandb_logger = WandbLogger(
+    #     name=config.model_name,
+    #     project="transformer-experiments",
+    #     config=vars(config),
+    # )
 
     # set up the model
-    model = GPTTransformer(
-        vocab_size=vocab_size,
-        d_embed=d_embed,
-        block_size=seq_len,
-        n_head=8,
-        n_layer=6,
-        dropout=dropout,
-    )
+    model = GPTTransformer(config)
 
     # set up the trainer
     trainer = pl.Trainer(
-        max_epochs=epoch,
+        max_epochs=config.epoch,
+        #   logger=wandb_logger,
         gpus=1,
-        logger=wandb_logger,
     )
 
     # train the model
@@ -64,22 +45,20 @@ def main(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset_path", default="../data/ml-25m/ratings.csv")
-    parser.add_argument("--dataset_name", default="ml-25m")
-    parser.add_argument("--model_name", default="neural-collab")
-    parser.add_argument("--epoch", type=int, default=20)
+    parser.add_argument("--model_name", default="transformer")
+    parser.add_argument("--epoch", type=int, default=10)
     parser.add_argument("--learning_rate", type=float, default=1e-3)
-    parser.add_argument("--batch_size", type=int, default=256)
+    parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--weight_decay", type=float, default=1e-5)
+    parser.add_argument("--seq_len", type=int, default=128)
+    parser.add_argument("--d_embed", type=int, default=64)
+    parser.add_argument("--n_layers", type=int, default=6)
+    parser.add_argument("--n_heads", type=int, default=8)
+    parser.add_argument("--dropout", type=float, default=0.2)
     args = parser.parse_args()
 
-    main(
-        args.dataset_name,
-        args.dataset_path,
-        args.model_name,
-        args.epoch,
-        args.learning_rate,
-        args.batch_size,
-        args.weight_decay,
-        args.save_dir,
-    )
+    # create the config from the args
+    config = Config(**vars(args))
+
+    # train a model from the config
+    train(config)

@@ -20,13 +20,14 @@ class TextDataset(IterableDataset):
     def __iter__(self) -> typing.Generator:
         """
         Stream characters from file and encode them.
-        When the sequence reaches the desired length, yield it.
+        When the sequence reaches the desired length + 1
+        (since the input is shifted by one), yield the sequence.
         """
         sequence = []
         for char in self.read_file():
             tokens = self.encoder.encode(char)
             for token in tokens:
-                if len(sequence) == self.seq_len:
+                if len(sequence) == self.seq_len + 1:
                     yield sequence
                     sequence = []
                 sequence.append(token)
