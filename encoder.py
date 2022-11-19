@@ -137,7 +137,7 @@ def create_encoder(path, num_merges=10000):
     # prepare the vocabulary and byte pair encodings
     vocab, merges = {}, {}
     if not os.path.exists("vocab.txt") or not os.path.exists("merges.txt"):
-        vocab, merges = VocabBuilder.build(path, num_merges)
+        vocab, merges = VocabBuilder()(path, num_merges)
 
         with open("vocab.txt", "w") as f:
             f.write(json.dumps(vocab))

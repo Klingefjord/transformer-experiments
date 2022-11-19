@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import pytorch_lightning as pl
 
 
 class GPTBlock(nn.Module):
@@ -31,7 +32,7 @@ class GPTBlock(nn.Module):
         return x
 
 
-class GPTTransformer(nn.Module):
+class GPTTransformer(pl.LightningModule):
     def __init__(
         self,
         vocab_size,

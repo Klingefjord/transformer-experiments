@@ -6,9 +6,8 @@ import typing
 class VocabBuilder:
     """Class that builds a vocab from a text corpus using byte-pair encodings"""
 
-    def build(self, path: str, num_merges: int = 10000) -> typing.Tuple[dict, dict]:
+    def __call__(self, path: str, num_merges: int = 10000) -> typing.Tuple[dict, dict]:
         """Build a vocab from a file"""
-
         vocab = self.load_vocab(path)
         tokens, merges = self.bpe(vocab, num_merges)
         return tokens, merges
