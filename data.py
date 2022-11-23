@@ -23,13 +23,13 @@ class TextDataset(IterableDataset):
     def read_file(self) -> typing.Generator:
         """Reads the file and yields each character."""
         lines = line_count(self.path)
-
-        start_line, end_line = 0, 0
+        end_line = lines
+        start_line = 0
 
         if self.fractions[0] > 0.0:
-            start = int(lines * self.start_fraction)
+            start_line = int(lines * self.fractions[0])
         if self.fractions[1] < 1.0:
-            end = int(lines * self.end_fraction)
+            end_line = int(lines * self.fractions[1])
 
         with open(self.path, "r") as f:
             for i, line in enumerate(f):
@@ -86,4 +86,18 @@ def prepare_data(
         test_dataset, batch_size=batch_size, collate_fn=lambda x: torch.tensor(x)
     )
 
-    return train_loader, val_loader, len(tokenizer.vocab)
+    return train_loader, val_loader, len(tokenizer.encoder)
+
+
+if __name__ == "__main__":
+    print("Preparing data...")
+
+    train_loader, val_loader, vocab_size = prepare_data()
+
+    for batch in train_loader:
+        print("Train batches:", batch.shape)
+        break
+
+    for batch in val_loader:
+        print("Test batches:", batch.shape)
+        break
