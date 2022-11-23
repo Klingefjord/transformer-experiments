@@ -5,17 +5,24 @@ import json
 import os
 import re
 import typing
-
 from vocab import VocabBuilder
-
+from utils import bytes_to_unicode
 
 class Encoder:
     """Encoder class to convert text to byte-pair encodings"""
 
     def __init__(self, vocab, merges) -> None:
-        self.encoder = vocab
-        self.decoder = {v: k for k, v in vocab.items()}
+        self.vocab = vocab
+        self.itos = {v: k for k, v in vocab.items()}
+
+        self.byte_encoder = bytes_to_unicode()
+        self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
+
         self.merges = dict(zip(merges, range(len(merges))))
+        # a regex for splitting words like 't, 're, etc. into separate tokens.
+        self.pat = re.compile(
+            r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
+        )
         self.cache = {}
 
     def encode(self, text) -> list[int]:
@@ -25,15 +32,21 @@ class Encoder:
         tokens = [w + "*" for w in text.split(" ")]
 
         for token in tokens:
+            # encode the token as a bytes (b'') object
+            token_bytes = token.encode("utf-8")
+
+            # translate all bytes to their unicode string representation and flatten
+            token_translated = "".join(self.byte_encoder[b] for b in token_bytes)
+
             token_merged = self.bpe(token).split(" ")
-            token_ix = [self.encoder[bpe_token] for bpe_token in token_merged]
+            token_ix = [self.vocab[bpe_token] for bpe_token in token_merged]
             bpe_idx.extend(token_ix)
 
         return bpe_idx
 
     def decode(self, bpe_idx) -> str:
         """Decode a list of byte-pair encodings into text"""
-        return "".join([self.decoder[idx] for idx in bpe_idx]).replace("*", " ").strip()
+        return "".join([self.itos[idx] for idx in bpe_idx]).replace("*", " ").strip()
 
     def get_bigrams(self, word) -> set[tuple[str, str]]:
         """Return a set of bigrams for a word"""

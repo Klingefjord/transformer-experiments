@@ -6,7 +6,8 @@ import requests
 
 
 def download_corpus(author_name: str, author_id: int) -> None:
-    """Download the works of the given author from gutenberg.org."""
+    """Download the works of the given author from gutenberg.org and save it to ./data/{author_name}.txt"""
+    
     page = requests.get(f"https://www.gutenberg.org/ebooks/author/{author_id}")
     soup = BeautifulSoup(page.content, "html.parser")
 
@@ -42,12 +43,7 @@ def download_corpus(author_name: str, author_id: int) -> None:
         text = text.split("\r\n\r\n\r\n\r\n\r\n***")[0]
 
         # create the directory if needed
-        if not os.path.exists(f"../data/{author_name}"):
-            os.makedirs(f"../data/{author_name}")
-
-        # save the book
-        path = f"../data/{author_name}/{link['href'].split('/')[-1]}"
-        with open(path, "w") as f:
+        with open(f"./data/{author_name}.txt", "a") as f:
             f.write(text)
 
 

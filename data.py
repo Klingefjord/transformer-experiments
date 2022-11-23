@@ -69,7 +69,7 @@ class TextDataset(IterableDataset):
 def get_vocab_size():
     """Returns the size of the vocabulary"""
     encoder = create_encoder("./data/pg16457.txt")
-    return len(encoder.encoder)
+    return len(encoder.vocab)
 
 
 def prepare_data(
@@ -93,4 +93,4 @@ def prepare_data(
         test_dataset, batch_size=batch_size, collate_fn=lambda x: torch.tensor(x)
     )
 
-    return train_loader, val_loader, len(encoder.encoder)
+    return train_loader, val_loader, len(encoder.vocab)
