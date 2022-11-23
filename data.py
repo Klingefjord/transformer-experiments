@@ -5,6 +5,39 @@ from torch.utils.data import DataLoader, IterableDataset
 from encoder import Encoder, create_encoder
 
 
+class ToyDataset(IterableDataset):
+    def __init__(self, path: str, encoder: Encoder, seq_len: int = 512) -> None:
+        self.seq_len = seq_len
+        self.encoder = encoder
+        self.path = path
+        self.max_lines = 10
+
+    def read_file(self) -> typing.Generator:
+        """Reads the file and yields each character."""
+        i = 0
+        with open(self.path, "r") as f:
+            for line in f:
+                yield from line.strip("\n")
+                i += 1
+                if i > self.max_lines:
+                    break
+
+    def __iter__(self) -> typing.Generator:
+        """
+        Stream characters from file and encode them.
+        When the sequence reaches the desired length + 1
+        (since the input is shifted by one), yield the sequence.
+        """
+        sequence = []
+        for char in self.read_file():
+            tokens = self.encoder.encode(char)
+            for token in tokens:
+                if len(sequence) == self.seq_len + 1:
+                    yield sequence
+                    sequence = []
+                sequence.append(token)
+
+
 class TextDataset(IterableDataset):
     def __init__(self, path: str, encoder: Encoder, seq_len: int = 512) -> None:
         self.seq_len = seq_len
@@ -48,6 +81,7 @@ def prepare_data(
     """Create the test and validation dataloaders"""
 
     encoder = create_encoder("./data/pg16457.txt")
+
     train_dataset = TextDataset(train_path, encoder, seq_len=seq_len)
     test_dataset = TextDataset(test_path, encoder, seq_len=seq_len)
 

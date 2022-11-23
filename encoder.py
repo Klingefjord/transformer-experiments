@@ -133,7 +133,7 @@ class Tokenizer:
         return text
 
 
-def create_encoder(path, num_merges=10000):
+def create_encoder(path, num_merges=1000):
     # prepare the vocabulary and byte pair encodings
     vocab, merges = {}, {}
     if not os.path.exists("vocab.txt") or not os.path.exists("merges.txt"):

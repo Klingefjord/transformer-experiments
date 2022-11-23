@@ -25,7 +25,13 @@ class GPTBlock(nn.Module):
         self.register_buffer("mask", torch.tril(torch.ones(block_size, block_size)))
 
         self.attn = lambda x: self.attn_dropout(
-            self.attention(x, x, x, attn_mask=self.mask, need_weights=False)[0]
+            self.attention(
+                x,
+                x,
+                x,
+                attn_mask=self.mask[: x.shape[1], : x.shape[1]],
+                need_weights=False,
+            )[0]
         )
 
         self.mlp = lambda x: self.mlp_dict.mlp_dropout(
@@ -84,14 +90,14 @@ class GPTTransformer(pl.LightningModule):
     def training_step(self, batch, _):
         x, y = batch[:, :-1], batch[:, 1:]
         y_hat = self(x)
-        loss = nn.CrossEntropyLoss()(y_hat.transpose(1, 2), y)
+        loss = nn.CrossEntropyLoss()(y_hat.permute(0, 2, 1), y)
         self.log("train_loss", loss)
         return loss
 
     def validation_step(self, batch, _):
         x, y = batch[:, :-1], batch[:, 1:]
         y_hat = self(x)
-        loss = nn.CrossEntropyLoss()(y_hat.transpose(1, 2), y)
+        loss = nn.CrossEntropyLoss()(y_hat.permute(0, 2, 1), y)
         self.log("val_loss", loss)
         return loss
 

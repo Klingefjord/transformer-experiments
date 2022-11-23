@@ -59,7 +59,7 @@ class VocabBuilder:
 
             return vocab
 
-    def bpe(self, vocab, num_merges=500) -> typing.Tuple[dict, dict]:
+    def bpe(self, vocab, num_merges=1000) -> typing.Tuple[dict, dict]:
         """Create byte-pair encodings from a text corpus"""
 
         merges = []
