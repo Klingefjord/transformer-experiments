@@ -11,6 +11,7 @@ class VocabBuilder:
     """Class that builds a vocab from a text corpus using byte-pair encodings"""
 
     def __init__(self):
+        # convert all bytes to human-readable unicode characters
         self.byte_encoder = bytes_to_unicode()
 
         # a regex for splitting words like 't, 're, etc. into separate tokens.
@@ -20,6 +21,7 @@ class VocabBuilder:
 
     def __call__(self, path: str, num_merges: int = 10000) -> typing.Tuple[dict, dict]:
         """Build a vocab from a file"""
+
         vocab = self.initialize_vocab(path)
         tokens, merges = self.bpe(vocab, num_merges)
         return tokens, merges
@@ -54,6 +56,9 @@ class VocabBuilder:
                 if token not in tokens:
                     tokens[token] = i
                     i += 1
+
+        # add special <|endoftext|> token
+        tokens["<|endoftext|>"] = i
 
         return tokens
 
@@ -91,7 +96,7 @@ class VocabBuilder:
             if i % (num_merges // 10) == 0:
                 print(
                     "Iteration: {}\t Tokens: {}".format(i, len(self.get_tokens(vocab)))
-            )
+                )
 
             pairs = self.get_pairs(vocab)
 
@@ -112,28 +117,28 @@ if __name__ == "__main__":
     builder = VocabBuilder()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--num_merges", type=int, default=300)
+    parser.add_argument("--num_merges", type=int, default=10000)
     parser.add_argument("--path", type=str, default="./data/dostoyevsky.txt")
     args = parser.parse_args()
 
     bpe_path = args.path.replace(".txt", ".bpe")
-    vocab_path = args.path.replace(".txt", ".bpe")
+    vocab_path = args.path.replace(".txt", ".vocab")
 
-    # build bpe vocab
+    # build
     print(f"Building vocabulary for {args.path}...")
     tokens, merges = builder(args.path, args.num_merges)
 
-    # save tokens
-    print("Saving tokens...")
-    with open("./data/dostoyevsky.bpe", "w") as f:
+    # save merges
+    print("Saving merges...")
+    with open(bpe_path, "w") as f:
         for merge in merges:
             f.write(" ".join(merge) + "\n")
 
-    # save merges
-    print("Saving merges...")
-    with open("./data/dostoyevsky.vocab", "w") as f:
+    # save vocab
+    print("Saving vocab...")
+    with open(vocab_path, "w") as f:
         f.write(json.dumps(tokens))
 
     print(
-        f"Built vocabulary of {len(tokens)} tokens. Should be 256 + {args.num_merges} = {256 + args.num_merges}."
+        f"Built vocabulary of {len(tokens)} tokens. Should be 1 + 256 + {args.num_merges} = {1 + 256 + args.num_merges}."
     )

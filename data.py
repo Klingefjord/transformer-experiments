@@ -2,11 +2,11 @@ import torch
 import typing
 from torch.utils.data import DataLoader, IterableDataset
 
-from encoder import Encoder, create_encoder
+from tokenizer import Tokenizer, create_encoder
 
 
 class ToyDataset(IterableDataset):
-    def __init__(self, path: str, encoder: Encoder, seq_len: int = 512) -> None:
+    def __init__(self, path: str, encoder: Tokenizer, seq_len: int = 512) -> None:
         self.seq_len = seq_len
         self.encoder = encoder
         self.path = path
@@ -39,7 +39,10 @@ class ToyDataset(IterableDataset):
 
 
 class TextDataset(IterableDataset):
-    def __init__(self, path: str, encoder: Encoder, seq_len: int = 512) -> None:
+    def __init__(
+        self, path: str, encoder: Tokenizer, seq_len: int = 512, start_fraction=0.0
+    ) -> None:
+        self.start_fraction = start_fraction
         self.seq_len = seq_len
         self.encoder = encoder
         self.path = path

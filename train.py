@@ -6,7 +6,7 @@ from data import prepare_data
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import WandbLogger
 import argparse
-from encoder import create_encoder
+from tokenizer import create_encoder
 from model import GPTTransformer
 from utils import Config
 
