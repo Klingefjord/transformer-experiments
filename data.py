@@ -1,63 +1,54 @@
+import subprocess
 import torch
 import typing
 from torch.utils.data import DataLoader, IterableDataset
 
-from tokenizer import Tokenizer, create_encoder
+from tokenizer import Tokenizer, create_tokenizer
 
 
-class ToyDataset(IterableDataset):
-    def __init__(self, path: str, encoder: Tokenizer, seq_len: int = 512) -> None:
+def line_count(filename):
+    """Efficiently count the number of lines in a file"""
+    return int(subprocess.check_output(["wc", "-l", filename]).split()[0])
+
+
+class TextDataset(IterableDataset):
+    def __init__(
+        self, path: str, encoder: Tokenizer, seq_len: int = 512, fractions=(0.0, 1.0)
+    ) -> None:
+        self.fractions = fractions
         self.seq_len = seq_len
         self.encoder = encoder
         self.path = path
-        self.max_lines = 10
 
     def read_file(self) -> typing.Generator:
         """Reads the file and yields each character."""
-        i = 0
+        lines = line_count(self.path)
+
+        start_line, end_line = 0, 0
+
+        if self.fractions[0] > 0.0:
+            start = int(lines * self.start_fraction)
+        if self.fractions[1] < 1.0:
+            end = int(lines * self.end_fraction)
+
         with open(self.path, "r") as f:
-            for line in f:
+            for i, line in enumerate(f):
+                # start from the right line
+                if i < start_line:
+                    continue
+
                 yield from line.strip("\n")
-                i += 1
-                if i > self.max_lines:
+
+                # end at the right line
+                if i > end_line:
                     break
 
     def __iter__(self) -> typing.Generator:
         """
         Stream characters from file and encode them.
         When the sequence reaches the desired length + 1
-        (since the input is shifted by one), yield the sequence.
-        """
-        sequence = []
-        for char in self.read_file():
-            tokens = self.encoder.encode(char)
-            for token in tokens:
-                if len(sequence) == self.seq_len + 1:
-                    yield sequence
-                    sequence = []
-                sequence.append(token)
-
-
-class TextDataset(IterableDataset):
-    def __init__(
-        self, path: str, encoder: Tokenizer, seq_len: int = 512, start_fraction=0.0
-    ) -> None:
-        self.start_fraction = start_fraction
-        self.seq_len = seq_len
-        self.encoder = encoder
-        self.path = path
-
-    def read_file(self) -> typing.Generator:
-        """Reads the file and yields each character."""
-        with open(self.path, "r") as f:
-            for line in f:
-                yield from line.strip("\n")
-
-    def __iter__(self) -> typing.Generator:
-        """
-        Stream characters from file and encode them.
-        When the sequence reaches the desired length + 1
-        (since the input is shifted by one), yield the sequence.
+        (since the input to the transformer is shifted by one),
+        yield the sequence.
         """
         sequence = []
         for char in self.read_file():
@@ -71,22 +62,21 @@ class TextDataset(IterableDataset):
 
 def get_vocab_size():
     """Returns the size of the vocabulary"""
-    encoder = create_encoder("./data/pg16457.txt")
+    encoder = create_tokenizer("./data/pg16457.txt")
     return len(encoder.vocab)
 
 
 def prepare_data(
-    batch_size=128,
-    seq_len=512,
-    train_path="./data/gutenberg_train.txt",
-    test_path="./data/gutenberg_test.txt",
+    batch_size=128, seq_len=512, path="./data/dostoyevsky.txt"
 ) -> typing.Tuple[DataLoader, DataLoader, int]:
     """Create the test and validation dataloaders"""
 
-    encoder = create_encoder("./data/pg16457.txt")
+    bpe_path = path.replace(".txt", ".bpe")
+    vocab_path = path.replace(".txt", ".vocab")
+    tokenizer = create_tokenizer(vocab_path, bpe_path)
 
-    train_dataset = TextDataset(train_path, encoder, seq_len=seq_len)
-    test_dataset = TextDataset(test_path, encoder, seq_len=seq_len)
+    train_dataset = TextDataset(path, tokenizer, seq_len=seq_len, fractions=(0.0, 0.7))
+    test_dataset = TextDataset(path, tokenizer, seq_len=seq_len, fractions=(0.7, 1.0))
 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, collate_fn=lambda x: torch.tensor(x)
@@ -96,4 +86,4 @@ def prepare_data(
         test_dataset, batch_size=batch_size, collate_fn=lambda x: torch.tensor(x)
     )
 
-    return train_loader, val_loader, len(encoder.vocab)
+    return train_loader, val_loader, len(tokenizer.vocab)

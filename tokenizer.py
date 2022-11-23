@@ -132,7 +132,7 @@ class Tokenizer:
         return word
 
 
-def create_encoder(vocab_path, bpe_path) -> Tokenizer:
+def create_tokenizer(vocab_path, bpe_path) -> Tokenizer:
     # prepare the vocabulary and byte pair encodings
     vocab, merges = {}, {}
 
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     parser.add_argument("--vocab_path", default="./data/dostoyevsky.vocab", type=str)
     args = parser.parse_args()
 
-    encoder = create_encoder(args.vocab_path, args.bpe_path)
+    encoder = create_tokenizer(args.vocab_path, args.bpe_path)
 
     # encode a sentence
     indices = encoder.encode("Hello, world! I am Oliver.")
