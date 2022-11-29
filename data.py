@@ -1,7 +1,7 @@
 import subprocess
 import torch
 import typing
-from torch.utils.data import DataLoader, IterableDataset
+from torch.utils.data import DataLoader, IterableDataset, Dataset
 
 from tokenizer import Tokenizer, create_tokenizer
 
@@ -60,6 +60,53 @@ class TextDataset(IterableDataset):
                 sequence.append(token)
 
 
+class TextDatasetBatched(Dataset):
+    def __init__(self, path, tokenizer, seq_len=512, fractions=(0.0, 1.0)):
+        self.fractions = fractions
+        self.seq_len = seq_len
+        self.tokenizer = tokenizer
+        self.data = self.prepare_data(path)
+
+    def prepare_data(self, path):
+        data = []
+        sequence = []
+
+        lines = line_count(path)
+        end_line = lines
+        start_line = 0
+
+        if self.fractions[0] > 0.0:
+            start_line = int(lines * self.fractions[0])
+        if self.fractions[1] < 1.0:
+            end_line = int(lines * self.fractions[1])
+
+        with open(path, "r") as f:
+            for i, line in enumerate(f):
+                # start from the right line
+                if i < start_line:
+                    continue
+
+                for token in self.tokenizer.encode(line):
+                    # seq_len + 1 since the input to the transformer is shifted by one
+                    if len(sequence) == self.seq_len + 1:
+                        data.append(sequence)
+                        sequence = []
+
+                    sequence.append(token)
+
+                # end at the right line
+                if i > end_line:
+                    break
+
+        return data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
+
+
 def get_vocab_size():
     """Returns the size of the vocabulary"""
     encoder = create_tokenizer("./data/pg16457.txt")
@@ -75,15 +122,30 @@ def prepare_data(
     vocab_path = path.replace(".txt", ".vocab")
     tokenizer = create_tokenizer(vocab_path, bpe_path)
 
-    train_dataset = TextDataset(path, tokenizer, seq_len=seq_len, fractions=(0.0, 0.7))
-    test_dataset = TextDataset(path, tokenizer, seq_len=seq_len, fractions=(0.7, 1.0))
+    train_dataset = TextDatasetBatched(
+        path,
+        tokenizer,
+        seq_len=seq_len,
+        fractions=(0.0, 0.7),
+    )
+    test_dataset = TextDatasetBatched(
+        path,
+        tokenizer,
+        seq_len=seq_len,
+        fractions=(0.7, 1.0),
+    )
 
     train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, collate_fn=lambda x: torch.tensor(x)
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        collate_fn=lambda x: torch.tensor(x),
     )
 
     val_loader = DataLoader(
-        test_dataset, batch_size=batch_size, collate_fn=lambda x: torch.tensor(x)
+        test_dataset,
+        batch_size=batch_size,
+        collate_fn=lambda x: torch.tensor(x),
     )
 
     return train_loader, val_loader, len(tokenizer.encoder)

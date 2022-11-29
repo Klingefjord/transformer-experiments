@@ -19,7 +19,7 @@ class VocabBuilder:
             r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
         )
 
-    def __call__(self, path: str, num_merges: int = 10000) -> typing.Tuple[dict, dict]:
+    def __call__(self, path: str, num_merges: int) -> typing.Tuple[dict, dict]:
         """Build a vocab from a file"""
 
         vocab = self.initialize_vocab(path)
@@ -87,13 +87,13 @@ class VocabBuilder:
 
             return vocab
 
-    def bpe(self, vocab: dict, num_merges=1000) -> typing.Tuple[dict, dict]:
+    def bpe(self, vocab: dict, num_merges: int) -> typing.Tuple[dict, dict]:
         """Create byte-pair encodings from a text corpus"""
 
         merges = []
 
         for i in range(num_merges):
-            if i % (num_merges // 10) == 0:
+            if i % 100 == 0:
                 print(
                     "Iteration: {}\t Tokens: {}".format(i, len(self.get_tokens(vocab)))
                 )

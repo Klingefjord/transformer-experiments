@@ -1,9 +1,13 @@
+import torch
+
+
 class Config:
     """A class to hold dynamic configuration parameters for a model."""
 
     def __init__(self, **kwargs):
         for (key, value) in kwargs.items():
             setattr(self, key, value)
+
 
 def bytes_to_unicode():
     """
@@ -31,3 +35,30 @@ def bytes_to_unicode():
 
     chars = [chr(n) for n in chars]
     return dict(zip(base_chars, chars))
+
+
+def generate(model, tokenizer, prompt="", num_samples=10, steps=20, do_sample=True):
+    """Generate text using the model."""
+
+    if prompt == "":
+        # to create unconditional samples...
+        # manually create a tensor with only the special <|endoftext|> token
+        # similar to what openai's code does here https://github.com/openai/gpt-2/blob/master/src/generate_unconditional_samples.py
+        x = torch.tensor([[tokenizer.encoder["<|endoftext|>"]]], dtype=torch.long)
+    else:
+        x = torch.tensor([tokenizer.encode(prompt)]).to(model.device)
+
+    # we'll process all desired num_samples in a batch, so expand out the batch dim
+    x = x.expand(num_samples, -1)
+
+    # forward the model `steps` times to get samples, in a batch
+    y = model.generate(x, max_new_tokens=steps, do_sample=do_sample, top_k=40)
+
+    out = ""
+
+    for i in range(num_samples):
+        out += tokenizer.decode(y[i].cpu().squeeze().tolist())
+        out += "\n"
+        out += "-" * 80
+        out += "\n"
+        return out
